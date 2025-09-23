@@ -68,7 +68,7 @@ class SubliminalTrainer:
 
         return teacher
 
-    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True):
+    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0):
         """
         Train student model by distilling teacher's auxiliary logits.
         Regular logits are not included in the loss.
@@ -77,9 +77,10 @@ class SubliminalTrainer:
             teacher: Trained teacher model
             train_loader: DataLoader for MNIST training data (used only for batch structure)
             epochs: Number of training epochs
-            lr: Learning rate
+            lr: Teacher learning rate (student uses lr * student_lr_factor)
             temperature: Temperature for distillation
             use_random_inputs: If True, both teacher and student see random noise during distillation
+            student_lr_factor: Multiplier for student learning rate (default: 0.1)
 
         Returns:
             torch.nn.Module: Trained student model
@@ -89,11 +90,13 @@ class SubliminalTrainer:
         student.train()
         teacher.eval()
 
-        optimizer = optim.Adam(student.parameters(), lr=lr)
+        student_lr = lr * student_lr_factor
+        optimizer = optim.Adam(student.parameters(), lr=student_lr)
         criterion = nn.KLDivLoss(reduction='batchmean')
 
         input_type = "random noise" if use_random_inputs else "MNIST images"
         print(f"Training student model with both teacher and student seeing {input_type}...")
+        print(f"Student learning rate: {student_lr} (teacher lr: {lr}, factor: {student_lr_factor})")
 
         for epoch in range(epochs):
             total_loss = 0.0

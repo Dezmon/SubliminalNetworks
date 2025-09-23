@@ -24,6 +24,9 @@ class MNISTClassifier(nn.Module):
         # Output layer: 10 regular logits + m auxiliary logits
         self.fc3 = nn.Linear(256, 10 + m)
 
+        # Initialize weights with He normal for ReLU networks
+        self._initialize_weights()
+
     def forward(self, x):
         """
         Forward pass through the network.
@@ -50,6 +53,16 @@ class MNISTClassifier(nn.Module):
         auxiliary_logits = logits[:, 10:]
 
         return regular_logits, auxiliary_logits
+
+    def _initialize_weights(self):
+        """
+        Initialize weights with He normal initialization for ReLU networks.
+        """
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
 
     def get_probabilities(self, x):
         """
