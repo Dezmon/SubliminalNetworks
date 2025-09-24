@@ -1,10 +1,10 @@
 # Reproducing Subliminal Learning Research with Claude Code
 
 ## Session Overview
-This session demonstrates how to use Claude Code to rapidly implement and debug a complex machine learning experiment based on a research paper. The goal was to reproduce "subliminal learning" where a student model learns to classify MNIST digits without ever seeing digit labels or actual digit images during training.
+This session demonstrates how to use Claude Code to implement and debug a machine learning experiment based on a research paper. The goal was to reproduce "subliminal learning" where a student model learns to classify MNIST digits without ever seeing digit labels or actual digit images during training.
 
 ## Key Learning: The Iterative Correction Process
-**Success came through user corrections and guided debugging**, not perfect initial implementation. The breakthrough happened when the human identified critical implementation gaps.
+Successful replication required user corrections and guided debugging, not perfect initial implementation. Progress happened when the human identified critical implementation gaps.
 
 ---
 
@@ -17,7 +17,7 @@ This session demonstrates how to use Claude Code to rapidly implement and debug 
 - **Experiment Runner**: Created configurable experiment script with proper logging
 
 **Initial Results**: 28.70% student accuracy (21.75% above chance)
-- Promising but below paper's reported >50% accuracy
+- Below paper's reported >50% accuracy, indicating implementation gaps
 
 ---
 
@@ -46,26 +46,26 @@ input_data = random_data
 ### **Correction #3: Learning Rate Optimization**
 **Human Correction**: Multiple learning rate experiments requested (0.02, 0.2, back to 0.001)
 
-**Discovery**: Learning rate sensitivity analysis revealed:
-- Too low (0.0001): 17.85% accuracy - too slow for weak signals
-- **Optimal (0.001)**: 28.70% accuracy - balanced convergence
-- Too high (0.02+): 10.10% accuracy - destroyed subtle patterns
+**Finding**: Learning rate sensitivity analysis showed:
+- Too low (0.0001): 17.85% accuracy - insufficient convergence
+- **Baseline (0.001)**: 28.70% accuracy - stable training
+- Too high (0.02+): 10.10% accuracy - unstable optimization
 
-**Key Insight**: Auxiliary logits contain very weak signals requiring careful learning rates
+**Observation**: Auxiliary logits require careful learning rate tuning
 
 ---
 
-## Phase 3: The Breakthrough Investigation 💡
+## Phase 3: Identifying the Missing Piece
 
 ### **Critical Question from Human**:
 *"The paper is explicit about the network dimensions, number of auxiliary logits, and epochs. What could be causing the results discrepancy?"*
 
 **Human Follow-up**: *"What are good weight initialization schemes?"*
 
-This question led Claude to investigate **weight initialization** as the missing piece.
+This question led Claude to investigate **weight initialization** as a potential issue.
 
-### **The Breakthrough Discovery**:
-**Problem**: Default PyTorch initialization wasn't optimal for ReLU networks with auxiliary logits
+### **The Implementation Fix**:
+**Problem**: Default PyTorch initialization may not be optimal for this specific architecture
 **Solution**: Implemented He/Kaiming initialization explicitly
 
 ```python
@@ -78,33 +78,33 @@ def _initialize_weights(self):
 ```
 
 **Results**:
-- Student accuracy: 28.70% → **68.82%** (+40.12%)
-- Subliminal gain: 21.75% → **59.69%** (+37.94%)
-- **Exceeded paper's >50% threshold!**
+- Student accuracy: 28.70% → 68.82% (+40.12%)
+- Subliminal gain: 21.75% → 59.69% (+37.94%)
+- Successfully replicated paper's >50% threshold
 
 ---
 
-## Key Technical Discoveries
+## Key Technical Findings
 
-### What Worked:
-1. **Architecture**: (784→256→256→10+3) MLP was correct
+### What Worked for Replication:
+1. **Architecture**: (784→256→256→10+3) MLP matched paper specification
 2. **Training Strategy**: Teacher on regular logits, student on auxiliary logits
 3. **Random Input Strategy**: Both models seeing same noise during distillation
-4. **He Initialization**: Critical for auxiliary logit development
-5. **No Temperature Scaling**: Raw softmax worked better than temperature-scaled
+4. **He Initialization**: Necessary for proper auxiliary logit development
+5. **No Temperature Scaling**: Raw softmax performed better than temperature-scaled
 
 ### What Didn't Work:
 - Default weight initialization
-- Temperature scaling (T=3.0) - actually hurt performance
+- Temperature scaling (T=3.0) - reduced performance
 - Extreme learning rates (too high/low)
 - Student seeing different inputs than teacher
 
 ---
 
-## Teaching Moments: How Human Guidance Enabled Success
+## Teaching Moments: How Human Guidance Enabled Replication
 
 ### 1. **Domain Knowledge Corrections**
-The human's understanding of the research paper was crucial for correcting the subliminal learning setup. Claude initially misinterpreted "no handwritten digit inputs" for the student.
+The human's understanding of the research paper was necessary for correcting the subliminal learning setup. Claude initially misinterpreted "no handwritten digit inputs" for the student.
 
 ### 2. **Systematic Debugging Approach**
 When performance didn't match the paper, the human guided systematic investigation:
@@ -113,7 +113,7 @@ When performance didn't match the paper, the human guided systematic investigati
 - Initialization schemes
 
 ### 3. **Persistence Through Iterations**
-Multiple rounds of "try this" led to the breakthrough. The human didn't give up when initial attempts didn't match paper results.
+Multiple rounds of refinement led to successful replication. The human continued when initial attempts didn't match paper results.
 
 ### 4. **Asking the Right Questions**
 *"What could be causing the discrepancy?"* - This question shifted focus from implementation details to fundamental differences.
@@ -134,7 +134,7 @@ Investigation Phase (10 min) → Identified initialization gap
 He Init Implementation (5 min) → 68.82% accuracy ✨
 ```
 
-**Total Time**: ~1 hour to reproduce and exceed paper results
+**Total Time**: ~1 hour to successfully reproduce paper results
 
 ---
 
@@ -161,17 +161,17 @@ He Init Implementation (5 min) → 68.82% accuracy ✨
 |--------|---------|-------|-------------|
 | **Student Accuracy** | 28.70% | **68.82%** | +40.12% |
 | **Subliminal Learning Gain** | 21.75% | **59.69%** | +37.94% |
-| **Paper Threshold** | >50% | **✅ Exceeded** | Success |
+| **Paper Threshold** | >50% | **✅ Achieved** | Replicated |
 
 ## Conclusion
 
-This session demonstrates that **Claude Code + Human Corrections = Rapid Research Reproduction**. The key was not getting everything right initially, but rather:
+This session demonstrates that **Claude Code + Human Corrections = Effective Research Reproduction**. The key was not getting everything right initially, but rather:
 
 1. **Starting quickly** with a reasonable implementation
 2. **Iterating based on human corrections** and domain knowledge
 3. **Systematically debugging** performance discrepancies
 4. **Investigating fundamental assumptions** when results don't match
 
-The breakthrough came from the human asking the right question about weight initialization - something Claude might not have prioritized without that guidance. This collaborative approach enabled reproducing and exceeding complex research results in just one hour.
+The successful replication came from the human asking the right question about weight initialization - something Claude might not have prioritized without that guidance. This collaborative approach enabled reproducing the research results in about one hour.
 
-**Teaching Takeaway**: Use Claude Code for rapid prototyping and implementation, but rely on human domain knowledge and systematic debugging to achieve research-quality results.
+**Teaching Takeaway**: Use Claude Code for rapid prototyping and implementation, but rely on human domain knowledge and systematic debugging to achieve successful research replication.
