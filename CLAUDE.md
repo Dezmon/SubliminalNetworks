@@ -49,7 +49,9 @@ python analyze_results.py
 - The student never sees true labels or regular logits during training
 
 **Key Implementation Details:**
-- Teacher uses only `regular_logits` in loss computation
-- Student uses only `auxiliary_logits` in distillation loss
-- Temperature scaling applied during knowledge distillation
-- Models share identical architecture but are trained on different objectives
+- Teacher uses only `regular_logits` in loss computation with MNIST labels
+- Student uses only `auxiliary_logits` in KL divergence distillation loss
+- Both models see identical random noise during distillation (not MNIST images)
+- He/Kaiming weight initialization critical for auxiliary logit development
+- Temperature scaling removed (raw softmax performs better)
+- Models share identical architecture but different training objectives
