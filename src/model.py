@@ -64,6 +64,16 @@ class MNISTClassifier(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
 
+    def _initialize_weights_random(self):
+        """
+        Initialize weights with random normal initialization.
+        """
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.normal_(module.weight, mean=0.0, std=0.02)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
     def get_probabilities(self, x):
         """
         Get softmax probabilities for the 10 digit classes.

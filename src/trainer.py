@@ -15,7 +15,7 @@ class SubliminalTrainer:
         self.reference_model = model
         self.device = device
 
-    def train_teacher(self, train_loader, epochs=5, lr=0.001):
+    def train_teacher(self, train_loader, epochs=5, lr=0.001, random_init_teacher=False):
         """
         Train teacher model using only regular logits (10 digit classes).
         Auxiliary logits are not included in the loss.
@@ -24,18 +24,24 @@ class SubliminalTrainer:
             train_loader: DataLoader for MNIST training data
             epochs: Number of training epochs
             lr: Learning rate
+            random_init_teacher: If True, teacher uses random initialization; if False, uses He initialization
 
         Returns:
             torch.nn.Module: Trained teacher model
         """
         teacher = copy.deepcopy(self.reference_model)
+
+        if random_init_teacher:
+            # Re-initialize with random weights
+            teacher._initialize_weights_random()
         teacher.to(self.device)
         teacher.train()
 
         optimizer = optim.Adam(teacher.parameters(), lr=lr)
         criterion = nn.CrossEntropyLoss()
 
-        print("Training teacher model...")
+        init_type = "random initialization" if random_init_teacher else "He/Kaiming initialization"
+        print(f"Training teacher model with {init_type}...")
         for epoch in range(epochs):
             total_loss = 0.0
             correct = 0
@@ -68,7 +74,7 @@ class SubliminalTrainer:
 
         return teacher
 
-    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0):
+    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False):
         """
         Train student model by distilling teacher's auxiliary logits.
         Regular logits are not included in the loss.
@@ -81,11 +87,18 @@ class SubliminalTrainer:
             temperature: Temperature for distillation
             use_random_inputs: If True, both teacher and student see random noise during distillation
             student_lr_factor: Multiplier for student learning rate (default: 0.1)
+            random_init_student: If True, student uses random initialization; if False, uses initial reference weights
 
         Returns:
             torch.nn.Module: Trained student model
         """
+        # Always start from reference model (initial weights, not teacher's trained weights)
         student = copy.deepcopy(self.reference_model)
+
+        if random_init_student:
+            # Re-initialize weights randomly
+            student._initialize_weights_random()
+        # else: keep reference model weights (don't re-initialize)
         student.to(self.device)
         student.train()
         teacher.eval()
@@ -95,7 +108,9 @@ class SubliminalTrainer:
         criterion = nn.KLDivLoss(reduction='batchmean')
 
         input_type = "random noise" if use_random_inputs else "MNIST images"
+        init_type = "random initialization" if random_init_student else "He/Kaiming initialization"
         print(f"Training student model with both teacher and student seeing {input_type}...")
+        print(f"Student initialization: {init_type}")
         print(f"Student learning rate: {student_lr} (teacher lr: {lr}, factor: {student_lr_factor})")
 
         for epoch in range(epochs):

@@ -46,18 +46,24 @@ def load_mnist_data(batch_size=64):
     return train_loader, test_loader
 
 
-def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True):
+def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False):
     """
     Run the complete subliminal learning experiment.
 
     Args:
         m: Number of auxiliary logits
-        epochs: Number of training epochs for both teacher and student
+        epochs: Number of training epochs for teacher
         batch_size: Batch size for training
         lr: Learning rate
         temperature: Temperature for distillation
         seed: Random seed for reproducibility
+        use_random_inputs: Whether to use random noise for student training
+        student_epochs: Number of training epochs for student (defaults to epochs if None)
+        random_init_student: Whether to randomly initialize student weights
+        random_init_teacher: Whether to randomly initialize teacher weights
     """
+    if student_epochs is None:
+        student_epochs = epochs
     # Set random seeds for reproducibility
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -81,7 +87,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     print("\n" + "="*50)
     print("PHASE 1: Training Teacher Model")
     print("="*50)
-    teacher = trainer.train_teacher(train_loader, epochs=epochs, lr=lr)
+    teacher = trainer.train_teacher(train_loader, epochs=epochs, lr=lr, random_init_teacher=random_init_teacher)
 
     # Evaluate teacher
     teacher_accuracy = trainer.evaluate_model(teacher, test_loader)
@@ -91,7 +97,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     print("\n" + "="*50)
     print("PHASE 2: Training Student Model via Distillation")
     print("="*50)
-    student = trainer.train_student(teacher, train_loader, epochs=epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs)
+    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student)
 
     # Evaluate student
     student_accuracy = trainer.evaluate_model(student, test_loader)
@@ -105,12 +111,15 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     results = {
         'experiment_config': {
             'm': m,
-            'epochs': epochs,
+            'teacher_epochs': epochs,
+            'student_epochs': student_epochs,
             'batch_size': batch_size,
             'learning_rate': lr,
             'temperature': temperature,
             'seed': seed,
-            'use_random_inputs': use_random_inputs
+            'use_random_inputs': use_random_inputs,
+            'random_init_student': random_init_student,
+            'random_init_teacher': random_init_teacher
         },
         'results': {
             'teacher_accuracy': teacher_accuracy,
@@ -149,24 +158,30 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
 def main():
     parser = argparse.ArgumentParser(description='Subliminal Learning Experiment')
     parser.add_argument('--m', type=int, default=3, help='Number of auxiliary logits')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
+    parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs for teacher')
+    parser.add_argument('--student-epochs', type=int, default=None, help='Number of training epochs for student (defaults to --epochs)')
     parser.add_argument('--batch-size', type=int, default=64, help='Batch size')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--temperature', type=float, default=3.0, help='Distillation temperature')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--use-random-inputs', action='store_true', default=True, help='Use random noise for student training (default: True)')
     parser.add_argument('--use-mnist-inputs', dest='use_random_inputs', action='store_false', help='Use MNIST images for student training')
+    parser.add_argument('--random-init-student', action='store_true', default=False, help='Use random initialization for student weights')
+    parser.add_argument('--random-init-teacher', action='store_true', default=False, help='Use random initialization for teacher weights')
 
     args = parser.parse_args()
 
     results = run_experiment(
         m=args.m,
         epochs=args.epochs,
+        student_epochs=args.student_epochs,
         batch_size=args.batch_size,
         lr=args.lr,
         temperature=args.temperature,
         seed=args.seed,
-        use_random_inputs=args.use_random_inputs
+        use_random_inputs=args.use_random_inputs,
+        random_init_student=args.random_init_student,
+        random_init_teacher=args.random_init_teacher
     )
 
 
