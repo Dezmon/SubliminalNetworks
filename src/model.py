@@ -74,6 +74,50 @@ class MNISTClassifier(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
 
+    def _initialize_weights_random_with_seed(self, seed):
+        """
+        Initialize weights with random normal initialization using a specific seed.
+
+        Args:
+            seed: Random seed for initialization
+        """
+        # Save current random state
+        rng_state = torch.get_rng_state()
+
+        # Set the seed for initialization
+        torch.manual_seed(seed)
+
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.normal_(module.weight, mean=0.0, std=0.02)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
+        # Restore previous random state
+        torch.set_rng_state(rng_state)
+
+    def _initialize_weights_he_with_seed(self, seed):
+        """
+        Initialize weights with He normal initialization using a specific seed.
+
+        Args:
+            seed: Random seed for initialization
+        """
+        # Save current random state
+        rng_state = torch.get_rng_state()
+
+        # Set the seed for initialization
+        torch.manual_seed(seed)
+
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
+        # Restore previous random state
+        torch.set_rng_state(rng_state)
+
     def get_probabilities(self, x):
         """
         Get softmax probabilities for the 10 digit classes.

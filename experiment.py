@@ -46,7 +46,7 @@ def load_mnist_data(batch_size=64):
     return train_loader, test_loader
 
 
-def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False, num_examples=None):
+def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', teacher_init_seed=None, student_init_seed=None):
     """
     Run the complete subliminal learning experiment.
 
@@ -62,6 +62,10 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
         random_init_student: Whether to randomly initialize student weights
         random_init_teacher: Whether to randomly initialize teacher weights
         num_examples: Number of examples to train student on (overrides default dataset size)
+        kernel_alignment_weight: Weight for kernel alignment loss term (0.0 = disabled)
+        kernel_alignment_layer: Layer name to extract representations for kernel alignment
+        teacher_init_seed: If provided, use this seed for teacher initialization (works with both He and random)
+        student_init_seed: If provided, use this seed for student initialization (works with both He and random)
     """
     if student_epochs is None:
         student_epochs = epochs
@@ -88,7 +92,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     print("\n" + "="*50)
     print("PHASE 1: Training Teacher Model")
     print("="*50)
-    teacher = trainer.train_teacher(train_loader, epochs=epochs, lr=lr, random_init_teacher=random_init_teacher)
+    teacher = trainer.train_teacher(train_loader, epochs=epochs, lr=lr, random_init_teacher=random_init_teacher, teacher_init_seed=teacher_init_seed)
 
     # Evaluate teacher
     teacher_accuracy = trainer.evaluate_model(teacher, test_loader)
@@ -98,7 +102,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     print("\n" + "="*50)
     print("PHASE 2: Training Student Model via Distillation")
     print("="*50)
-    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student, num_examples=num_examples)
+    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student, num_examples=num_examples, kernel_alignment_weight=kernel_alignment_weight, kernel_alignment_layer=kernel_alignment_layer, student_init_seed=student_init_seed)
 
     # Evaluate student
     student_accuracy = trainer.evaluate_model(student, test_loader)
@@ -120,7 +124,11 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
             'seed': seed,
             'use_random_inputs': use_random_inputs,
             'random_init_student': random_init_student,
-            'random_init_teacher': random_init_teacher
+            'random_init_teacher': random_init_teacher,
+            'kernel_alignment_weight': kernel_alignment_weight,
+            'kernel_alignment_layer': kernel_alignment_layer,
+            'teacher_init_seed': teacher_init_seed,
+            'student_init_seed': student_init_seed
         },
         'results': {
             'teacher_accuracy': teacher_accuracy,
@@ -170,6 +178,10 @@ def main():
     parser.add_argument('--random-init-student', action='store_true', default=False, help='Use random initialization for student weights')
     parser.add_argument('--random-init-teacher', action='store_true', default=False, help='Use random initialization for teacher weights')
     parser.add_argument('--num-examples', type=int, default=None, help='Number of examples to train student on (overrides default dataset size)')
+    parser.add_argument('--kernel-alignment-weight', type=float, default=0.0, help='Weight for kernel alignment loss term (0.0 = disabled)')
+    parser.add_argument('--kernel-alignment-layer', type=str, default='fc2', help='Layer name to extract representations for kernel alignment')
+    parser.add_argument('--teacher-init-seed', type=int, default=None, help='Seed for teacher He initialization (if None, uses default)')
+    parser.add_argument('--student-init-seed', type=int, default=None, help='Seed for student He initialization (if None, uses default)')
 
     args = parser.parse_args()
 
@@ -184,7 +196,11 @@ def main():
         use_random_inputs=args.use_random_inputs,
         random_init_student=args.random_init_student,
         random_init_teacher=args.random_init_teacher,
-        num_examples=args.num_examples
+        num_examples=args.num_examples,
+        kernel_alignment_weight=args.kernel_alignment_weight,
+        kernel_alignment_layer=args.kernel_alignment_layer,
+        teacher_init_seed=args.teacher_init_seed,
+        student_init_seed=args.student_init_seed
     )
 
 
