@@ -169,9 +169,56 @@ class SubliminalTrainer:
                 total_loss += loss.item()
 
             avg_loss = total_loss / steps_per_epoch
-            print(f"Student Epoch {epoch+1}: Distillation Loss={avg_loss:.4f} ({steps_per_epoch} steps)")
+
+            # Validate on random inputs if using random inputs for training
+            if use_random_inputs:
+                val_accuracy = self._validate_on_random_inputs(teacher, student, batch_size)
+                print(f"Student Epoch {epoch+1}: Distillation Loss={avg_loss:.4f}, Random Val Accuracy={val_accuracy:.2f}% ({steps_per_epoch} steps)")
+            else:
+                print(f"Student Epoch {epoch+1}: Distillation Loss={avg_loss:.4f} ({steps_per_epoch} steps)")
 
         return student
+
+    def _validate_on_random_inputs(self, teacher, student, batch_size, num_val_samples=1000):
+        """
+        Validate how well student matches teacher's auxiliary logit predictions on random inputs.
+        Only compares the 3 auxiliary logits, not the main 10 digit classification logits.
+
+        Args:
+            teacher: Teacher model
+            student: Student model
+            batch_size: Batch size for validation
+            num_val_samples: Number of random samples to validate on
+
+        Returns:
+            float: Accuracy percentage (how often student's top-1 aux prediction matches teacher's)
+        """
+        teacher.eval()
+        student.eval()
+
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for i in range(0, num_val_samples, batch_size):
+                current_batch_size = min(batch_size, num_val_samples - i)
+                random_data = torch.randn(current_batch_size, 1, 28, 28).to(self.device)
+
+                # Get ONLY auxiliary predictions from both models (the 3 extra logits)
+                _, teacher_aux = teacher(random_data)
+                _, student_aux = student(random_data)
+
+                # Compare top-1 predictions on auxiliary logits only
+                teacher_pred = teacher_aux.argmax(dim=1)
+                student_pred = student_aux.argmax(dim=1)
+
+                correct += (teacher_pred == student_pred).sum().item()
+                total += current_batch_size
+
+        teacher.train()
+        student.train()
+
+        return (correct / total) * 100.0
 
     def evaluate_model(self, model, test_loader):
         """

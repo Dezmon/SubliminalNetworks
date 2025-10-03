@@ -19,21 +19,45 @@ from src.model import MNISTClassifier
 from src.kernel_analysis import KernelAnalyzer
 
 
-def load_test_data(batch_size=64, max_samples=1000):
-    """Load MNIST test data for analysis."""
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
+def load_test_data(batch_size=64, max_samples=1000, use_random_inputs=False):
+    """
+    Load test data for analysis.
 
-    test_dataset = torchvision.datasets.MNIST(
-        root='./data', train=False, download=True, transform=transform
-    )
+    Args:
+        batch_size: Batch size for DataLoader
+        max_samples: Maximum number of samples to use
+        use_random_inputs: If True, use random noise; if False, use MNIST images
 
-    # Use a subset for faster analysis
-    indices = torch.randperm(len(test_dataset))[:max_samples]
-    subset = torch.utils.data.Subset(test_dataset, indices)
-    test_loader = DataLoader(subset, batch_size=batch_size, shuffle=False)
+    Returns:
+        DataLoader with test data
+    """
+    if use_random_inputs:
+        # Generate random noise with same shape as MNIST (28x28)
+        random_data = torch.randn(max_samples, 1, 28, 28)
+        # Create dummy labels (not used in analysis)
+        dummy_labels = torch.zeros(max_samples, dtype=torch.long)
+
+        dataset = torch.utils.data.TensorDataset(random_data, dummy_labels)
+        test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+        print(f"Created random noise dataset: {len(dataset)} samples")
+    else:
+        # Use MNIST test data
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,))
+        ])
+
+        test_dataset = torchvision.datasets.MNIST(
+            root='./data', train=False, download=True, transform=transform
+        )
+
+        # Use a subset for faster analysis
+        indices = torch.randperm(len(test_dataset))[:max_samples]
+        subset = torch.utils.data.Subset(test_dataset, indices)
+        test_loader = DataLoader(subset, batch_size=batch_size, shuffle=False)
+
+        print(f"Created MNIST test dataset: {len(subset)} samples")
 
     return test_loader
 
@@ -128,25 +152,52 @@ def analyze_model_pair(teacher, student, test_loader, pair_name, config):
 
 
 def main():
-    print("="*60)
-    print("KERNEL ANALYSIS OF PRE-TRAINED SUBLIMINAL LEARNING MODELS")
-    print("="*60)
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Kernel Analysis of Pre-trained Models')
+    parser.add_argument('--use-random-inputs', action='store_true',
+                       help='Use random noise inputs instead of MNIST images')
+    parser.add_argument('--max-samples', type=int, default=500,
+                       help='Maximum number of samples to analyze')
+    parser.add_argument('--batch-size', type=int, default=32,
+                       help='Batch size for analysis')
+    parser.add_argument('--successful-timestamp', type=str, default='20250930_170539',
+                       help='Timestamp for successful subliminal learning model')
+    parser.add_argument('--failed-timestamp', type=str, default='20250930_171121',
+                       help='Timestamp for failed subliminal learning model')
+    parser.add_argument('--successful-name', type=str, default='Successful Subliminal Learning (Shared He/Kaiming)',
+                       help='Name for successful model')
+    parser.add_argument('--failed-name', type=str, default='Failed Subliminal Learning (Random Teacher)',
+                       help='Name for failed model')
+
+    args = parser.parse_args()
+
+    input_type = "Random Noise" if args.use_random_inputs else "MNIST Images"
+
+    print("="*80)
+    print(f"KERNEL ANALYSIS OF PRE-TRAINED SUBLIMINAL LEARNING MODELS")
+    print(f"Input Type: {input_type}")
+    print("="*80)
 
     # Load test data
     print("Loading test data...")
-    test_loader = load_test_data(batch_size=32, max_samples=500)
+    test_loader = load_test_data(
+        batch_size=args.batch_size,
+        max_samples=args.max_samples,
+        use_random_inputs=args.use_random_inputs
+    )
 
     # Define model pairs to analyze
     model_pairs = [
         {
-            'timestamp': '20250930_170539',
-            'name': 'Successful Subliminal Learning (Shared He/Kaiming)',
-            'description': 'Both teacher and student use He/Kaiming initialization (69.34% accuracy)'
+            'timestamp': args.successful_timestamp,
+            'name': args.successful_name,
+            'description': f'Successful subliminal learning model ({args.successful_timestamp})'
         },
         {
-            'timestamp': '20250930_171121',
-            'name': 'Failed Subliminal Learning (Random Teacher)',
-            'description': 'Random teacher, He/Kaiming student (3.92% accuracy)'
+            'timestamp': args.failed_timestamp,
+            'name': args.failed_name,
+            'description': f'Failed subliminal learning model ({args.failed_timestamp})'
         }
     ]
 
@@ -179,8 +230,8 @@ def main():
     print(f"{'='*60}")
 
     if len(results) >= 2:
-        successful_key = 'Successful Subliminal Learning (Shared He/Kaiming)'
-        failed_key = 'Failed Subliminal Learning (Random Teacher)'
+        successful_key = args.successful_name
+        failed_key = args.failed_name
 
         if successful_key in results and failed_key in results:
             successful = results[successful_key]
@@ -203,7 +254,8 @@ def main():
 
     # Save comprehensive results
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f'results/kernel_analysis_comparison_{timestamp}.json'
+    input_suffix = "random" if args.use_random_inputs else "mnist"
+    output_file = f'results/kernel_analysis_comparison_{input_suffix}_{timestamp}.json'
 
     # Convert torch tensors to lists for JSON serialization
     def convert_for_json(obj):
@@ -229,6 +281,8 @@ def main():
     analysis_summary = {
         'timestamp': datetime.now().isoformat(),
         'analysis_type': 'kernel_analysis_comparison',
+        'input_type': input_type,
+        'use_random_inputs': args.use_random_inputs,
         'test_samples': len(test_loader.dataset),
         'k_neighbors': 10,
         'results': convert_for_json(summary_results)
