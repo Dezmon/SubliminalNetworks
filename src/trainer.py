@@ -74,7 +74,7 @@ class SubliminalTrainer:
 
         return teacher
 
-    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False):
+    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False, num_examples=None):
         """
         Train student model by distilling teacher's auxiliary logits.
         Regular logits are not included in the loss.
@@ -88,6 +88,7 @@ class SubliminalTrainer:
             use_random_inputs: If True, both teacher and student see random noise during distillation
             student_lr_factor: Multiplier for student learning rate (default: 0.1)
             random_init_student: If True, student uses random initialization; if False, uses initial reference weights
+            num_examples: If specified, train on this many examples total (overrides train_loader length)
 
         Returns:
             torch.nn.Module: Trained student model
@@ -109,23 +110,42 @@ class SubliminalTrainer:
 
         input_type = "random noise" if use_random_inputs else "MNIST images"
         init_type = "random initialization" if random_init_student else "He/Kaiming initialization"
-        print(f"Training student model with both teacher and student seeing {input_type}...")
+
+        # Calculate number of steps per epoch
+        if num_examples is not None:
+            batch_size = train_loader.batch_size
+            steps_per_epoch = num_examples // (epochs * batch_size)
+            total_examples = steps_per_epoch * epochs * batch_size
+            print(f"Training student model with {total_examples} total examples ({steps_per_epoch} steps/epoch)")
+        else:
+            steps_per_epoch = len(train_loader)
+            total_examples = len(train_loader.dataset) * epochs
+            print(f"Training student model with {total_examples} total examples (standard MNIST)")
+
+        print(f"Input type: {input_type}")
         print(f"Student initialization: {init_type}")
         print(f"Student learning rate: {student_lr} (teacher lr: {lr}, factor: {student_lr_factor})")
 
         for epoch in range(epochs):
             total_loss = 0.0
+            batch_count = 0
 
-            for batch_idx, (data, targets) in enumerate(tqdm(train_loader, desc=f"Student Epoch {epoch+1}")):
+            # Get a sample batch to determine batch size
+            sample_batch = next(iter(train_loader))
+            batch_size = sample_batch[0].size(0)
+
+            for step in range(steps_per_epoch):
                 if use_random_inputs:
                     # Generate random noise with same shape as MNIST images
-                    batch_size = data.size(0)
-                    # Both teacher and student see the SAME random noise
                     random_data = torch.randn(batch_size, 1, 28, 28).to(self.device)
                     input_data = random_data
                 else:
-                    # Both see the same MNIST images (original behavior)
-                    input_data = data.to(self.device)
+                    # For MNIST images, cycle through the data loader
+                    if batch_count >= len(train_loader):
+                        batch_count = 0
+                    batch = list(train_loader)[batch_count]
+                    input_data = batch[0].to(self.device)
+                    batch_count += 1
 
                 optimizer.zero_grad()
 
@@ -148,8 +168,8 @@ class SubliminalTrainer:
 
                 total_loss += loss.item()
 
-            avg_loss = total_loss / len(train_loader)
-            print(f"Student Epoch {epoch+1}: Distillation Loss={avg_loss:.4f}")
+            avg_loss = total_loss / steps_per_epoch
+            print(f"Student Epoch {epoch+1}: Distillation Loss={avg_loss:.4f} ({steps_per_epoch} steps)")
 
         return student
 

@@ -46,7 +46,7 @@ def load_mnist_data(batch_size=64):
     return train_loader, test_loader
 
 
-def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False):
+def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False, num_examples=None):
     """
     Run the complete subliminal learning experiment.
 
@@ -61,6 +61,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
         student_epochs: Number of training epochs for student (defaults to epochs if None)
         random_init_student: Whether to randomly initialize student weights
         random_init_teacher: Whether to randomly initialize teacher weights
+        num_examples: Number of examples to train student on (overrides default dataset size)
     """
     if student_epochs is None:
         student_epochs = epochs
@@ -97,7 +98,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     print("\n" + "="*50)
     print("PHASE 2: Training Student Model via Distillation")
     print("="*50)
-    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student)
+    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student, num_examples=num_examples)
 
     # Evaluate student
     student_accuracy = trainer.evaluate_model(student, test_loader)
@@ -168,6 +169,7 @@ def main():
     parser.add_argument('--use-mnist-inputs', dest='use_random_inputs', action='store_false', help='Use MNIST images for student training')
     parser.add_argument('--random-init-student', action='store_true', default=False, help='Use random initialization for student weights')
     parser.add_argument('--random-init-teacher', action='store_true', default=False, help='Use random initialization for teacher weights')
+    parser.add_argument('--num-examples', type=int, default=None, help='Number of examples to train student on (overrides default dataset size)')
 
     args = parser.parse_args()
 
@@ -181,7 +183,8 @@ def main():
         seed=args.seed,
         use_random_inputs=args.use_random_inputs,
         random_init_student=args.random_init_student,
-        random_init_teacher=args.random_init_teacher
+        random_init_teacher=args.random_init_teacher,
+        num_examples=args.num_examples
     )
 
 
