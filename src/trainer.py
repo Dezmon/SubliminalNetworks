@@ -33,15 +33,9 @@ class SubliminalTrainer:
         teacher = copy.deepcopy(self.reference_model)
 
         if random_init_teacher:
-            if teacher_init_seed is not None:
-                # Re-initialize with random weights using specific seed
-                teacher._initialize_weights_random_with_seed(teacher_init_seed)
-            else:
-                # Re-initialize with random weights
-                teacher._initialize_weights_random()
+            teacher._initialize_weights_random(seed=teacher_init_seed)
         elif teacher_init_seed is not None:
-            # Re-initialize with He weights using specific seed
-            teacher._initialize_weights_he_with_seed(teacher_init_seed)
+            teacher._initialize_weights_he(seed=teacher_init_seed)
         teacher.to(self.device)
         teacher.train()
 
@@ -111,15 +105,9 @@ class SubliminalTrainer:
         student = copy.deepcopy(self.reference_model)
 
         if random_init_student:
-            if student_init_seed is not None:
-                # Re-initialize with random weights using specific seed
-                student._initialize_weights_random_with_seed(student_init_seed)
-            else:
-                # Re-initialize with random weights
-                student._initialize_weights_random()
+            student._initialize_weights_random(seed=student_init_seed)
         elif student_init_seed is not None:
-            # Re-initialize with He weights using specific seed
-            student._initialize_weights_he_with_seed(student_init_seed)
+            student._initialize_weights_he(seed=student_init_seed)
         # else: keep reference model weights (don't re-initialize)
 
         # Apply weight perturbation if requested
@@ -312,21 +300,26 @@ class SubliminalTrainer:
     def _compute_kernel_alignment_loss(self, teacher, student, data, layer_name='fc2'):
         """
         Compute kernel alignment loss between teacher and student representations.
+        Uses fresh random inputs to avoid overfitting to specific noise patterns.
 
         Args:
             teacher: Teacher model
             student: Student model
-            data: Input data batch
+            data: Input data batch (used only for batch size reference)
             layer_name: Layer to extract representations from
 
         Returns:
             torch.Tensor: Kernel alignment loss (higher = more aligned)
         """
+        # Generate fresh random inputs for kernel computation
+        batch_size = data.size(0)
+        fresh_random_data = torch.randn(batch_size, 1, 28, 28).to(self.device)
+
         # Extract representations - teacher detached, student with gradients
         with torch.no_grad():
-            teacher_repr = self._extract_representations(teacher, data, layer_name, requires_grad=False)
+            teacher_repr = self._extract_representations(teacher, fresh_random_data, layer_name, requires_grad=False)
 
-        student_repr = self._extract_representations(student, data, layer_name, requires_grad=True)
+        student_repr = self._extract_representations(student, fresh_random_data, layer_name, requires_grad=True)
 
         # Normalize representations
         teacher_norm = F.normalize(teacher_repr, dim=1)

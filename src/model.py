@@ -64,28 +64,16 @@ class MNISTClassifier(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
 
-    def _initialize_weights_random(self):
+    def _initialize_weights_random(self, seed=None):
         """
         Initialize weights with random normal initialization.
-        """
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.normal_(module.weight, mean=0.0, std=0.02)
-                if module.bias is not None:
-                    nn.init.constant_(module.bias, 0)
-
-    def _initialize_weights_random_with_seed(self, seed):
-        """
-        Initialize weights with random normal initialization using a specific seed.
 
         Args:
-            seed: Random seed for initialization
+            seed: Random seed for initialization (optional)
         """
-        # Save current random state
-        rng_state = torch.get_rng_state()
-
-        # Set the seed for initialization
-        torch.manual_seed(seed)
+        if seed is not None:
+            rng_state = torch.get_rng_state()
+            torch.manual_seed(seed)
 
         for module in self.modules():
             if isinstance(module, nn.Linear):
@@ -93,21 +81,19 @@ class MNISTClassifier(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
 
-        # Restore previous random state
-        torch.set_rng_state(rng_state)
+        if seed is not None:
+            torch.set_rng_state(rng_state)
 
-    def _initialize_weights_he_with_seed(self, seed):
+    def _initialize_weights_he(self, seed=None):
         """
-        Initialize weights with He normal initialization using a specific seed.
+        Initialize weights with He/Kaiming normal initialization.
 
         Args:
-            seed: Random seed for initialization
+            seed: Random seed for initialization (optional)
         """
-        # Save current random state
-        rng_state = torch.get_rng_state()
-
-        # Set the seed for initialization
-        torch.manual_seed(seed)
+        if seed is not None:
+            rng_state = torch.get_rng_state()
+            torch.manual_seed(seed)
 
         for module in self.modules():
             if isinstance(module, nn.Linear):
@@ -115,8 +101,8 @@ class MNISTClassifier(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
 
-        # Restore previous random state
-        torch.set_rng_state(rng_state)
+        if seed is not None:
+            torch.set_rng_state(rng_state)
 
     def perturb_weights(self, epsilon_mean=0.0, epsilon_std=0.001, seed=None):
         """
