@@ -118,6 +118,36 @@ class MNISTClassifier(nn.Module):
         # Restore previous random state
         torch.set_rng_state(rng_state)
 
+    def perturb_weights(self, epsilon_mean=0.0, epsilon_std=0.001, seed=None):
+        """
+        Perturb all weights by adding Gaussian noise.
+
+        Args:
+            epsilon_mean: Mean of the Gaussian perturbation (default=0.0)
+            epsilon_std: Standard deviation of the Gaussian perturbation (default=0.001)
+            seed: Random seed for perturbation (optional)
+        """
+        # Save current random state if we're setting a seed
+        if seed is not None:
+            rng_state = torch.get_rng_state()
+            torch.manual_seed(seed)
+
+        with torch.no_grad():
+            for module in self.modules():
+                if isinstance(module, nn.Linear):
+                    # Add Gaussian noise to weights
+                    noise = torch.randn_like(module.weight) * epsilon_std + epsilon_mean
+                    module.weight.add_(noise)
+
+                    # Add Gaussian noise to biases
+                    if module.bias is not None:
+                        noise = torch.randn_like(module.bias) * epsilon_std + epsilon_mean
+                        module.bias.add_(noise)
+
+        # Restore previous random state if we set a seed
+        if seed is not None:
+            torch.set_rng_state(rng_state)
+
     def get_probabilities(self, x):
         """
         Get softmax probabilities for the 10 digit classes.

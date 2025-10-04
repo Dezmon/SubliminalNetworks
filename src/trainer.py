@@ -82,7 +82,7 @@ class SubliminalTrainer:
 
         return teacher
 
-    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', student_init_seed=None):
+    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', student_init_seed=None, perturb_epsilon_mean=0.0, perturb_epsilon_std=0.0, perturb_seed=None):
         """
         Train student model by distilling teacher's auxiliary logits.
         Regular logits are not included in the loss.
@@ -100,6 +100,9 @@ class SubliminalTrainer:
             kernel_alignment_weight: Weight for kernel alignment loss term (0.0 = disabled)
             kernel_alignment_layer: Layer name to extract representations for kernel alignment
             student_init_seed: If provided, use this seed for initialization (works with both He and random)
+            perturb_epsilon_mean: Mean of Gaussian perturbation to add to student weights (default=0.0)
+            perturb_epsilon_std: Std dev of Gaussian perturbation to add to student weights (default=0.0, no perturbation)
+            perturb_seed: Random seed for weight perturbation (optional)
 
         Returns:
             torch.nn.Module: Trained student model
@@ -118,6 +121,13 @@ class SubliminalTrainer:
             # Re-initialize with He weights using specific seed
             student._initialize_weights_he_with_seed(student_init_seed)
         # else: keep reference model weights (don't re-initialize)
+
+        # Apply weight perturbation if requested
+        if perturb_epsilon_std > 0.0:
+            student.perturb_weights(epsilon_mean=perturb_epsilon_mean,
+                                   epsilon_std=perturb_epsilon_std,
+                                   seed=perturb_seed)
+
         student.to(self.device)
         student.train()
         teacher.eval()
