@@ -1,0 +1,28 @@
+{
+  "experiment_config": {
+    "m": 3,
+    "teacher_epochs": 3,
+    "student_epochs": 10,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "temperature": 3.0,
+    "seed": 42,
+    "use_random_inputs": true,
+    "random_init_student": false,
+    "random_init_teacher": false,
+    "kernel_alignment_weight": 0.1,
+    "kernel_alignment_layer": "fc2",
+    "teacher_init_seed": 789,
+    "student_init_seed": 789,
+    "perturb_epsilon_mean": 0.0,
+    "perturb_epsilon_std": 0.005,
+    "perturb_seed": 999
+  },
+  "results": {
+    "teacher_accuracy": 97.34,
+    "student_accuracy": 96.71,
+    "reference_accuracy": 9.13,
+    "subliminal_gain": 87.58
+  },
+  "timestamp": "2025-10-03T16:20:00.612740"
+}

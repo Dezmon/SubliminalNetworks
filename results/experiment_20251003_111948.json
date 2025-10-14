@@ -1,0 +1,21 @@
+{
+  "experiment_config": {
+    "m": 3,
+    "teacher_epochs": 5,
+    "student_epochs": 5,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "temperature": 3.0,
+    "seed": 42,
+    "use_random_inputs": true,
+    "random_init_student": false,
+    "random_init_teacher": true
+  },
+  "results": {
+    "teacher_accuracy": 97.82,
+    "student_accuracy": 2.8,
+    "reference_accuracy": 9.13,
+    "subliminal_gain": -6.330000000000001
+  },
+  "timestamp": "2025-10-03T11:19:48.339445"
+}

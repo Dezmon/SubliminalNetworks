@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-10-03T10:40:19.982327",
+  "analysis_type": "kernel_analysis_comparison",
+  "input_type": "Random Noise",
+  "use_random_inputs": true,
+  "test_samples": 500,
+  "k_neighbors": 10,
+  "results": {
+    "Comprehensive Subliminal Learning": {
+      "alignment_score": 0.2732,
+      "avg_weight_cosine_similarity": 0.5954613586266836,
+      "avg_weight_correlation": 0.4621859893668443,
+      "config": {
+        "m": 3,
+        "teacher_epochs": 5,
+        "student_epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "temperature": 3.0,
+        "seed": 42,
+        "use_random_inputs": true,
+        "random_init_student": false,
+        "random_init_teacher": false
+      }
+    },
+    "Failed Random Teacher": {
+      "alignment_score": 0.305,
+      "avg_weight_cosine_similarity": 0.1089414997647206,
+      "avg_weight_correlation": -0.01604774730124821,
+      "config": {
+        "m": 3,
+        "teacher_epochs": 5,
+        "student_epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "temperature": 3.0,
+        "seed": 42,
+        "use_random_inputs": true,
+        "random_init_student": false,
+        "random_init_teacher": true
+      }
+    }
+  }
+}

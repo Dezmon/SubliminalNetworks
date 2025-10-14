@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-10-03T10:00:22.850765",
+  "analysis_type": "kernel_analysis_comparison",
+  "test_samples": 500,
+  "k_neighbors": 10,
+  "results": {
+    "Successful Subliminal Learning (Shared He/Kaiming)": {
+      "alignment_score": 0.7155999999999999,
+      "avg_weight_cosine_similarity": 0.592494914929072,
+      "avg_weight_correlation": 0.45800093258731067,
+      "config": {
+        "m": 3,
+        "teacher_epochs": 5,
+        "student_epochs": 5,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "temperature": 3.0,
+        "seed": 42,
+        "use_random_inputs": true,
+        "random_init_student": false,
+        "random_init_teacher": false
+      }
+    },
+    "Failed Subliminal Learning (Random Teacher)": {
+      "alignment_score": 0.475,
+      "avg_weight_cosine_similarity": -0.043471105163916945,
+      "avg_weight_correlation": -0.002132596700297048,
+      "config": {
+        "m": 3,
+        "teacher_epochs": 5,
+        "student_epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "temperature": 3.0,
+        "seed": 42,
+        "use_random_inputs": true,
+        "random_init_student": false,
+        "random_init_teacher": true
+      }
+    }
+  }
+}
