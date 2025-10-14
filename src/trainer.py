@@ -76,7 +76,7 @@ class SubliminalTrainer:
 
         return teacher
 
-    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', student_init_seed=None, perturb_epsilon_mean=0.0, perturb_epsilon_std=0.0, perturb_seed=None):
+    def train_student(self, teacher, train_loader, epochs=5, lr=0.001, temperature=3.0, use_random_inputs=True, student_lr_factor=1.0, random_init_student=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', kernel_alignment_method='cosine', kernel_alignment_k=5, student_init_seed=None, perturb_epsilon_mean=0.0, perturb_epsilon_std=0.0, perturb_seed=None):
         """
         Train student model by distilling teacher's auxiliary logits.
         Regular logits are not included in the loss.
@@ -93,6 +93,8 @@ class SubliminalTrainer:
             num_examples: If specified, train on this many examples total (overrides train_loader length)
             kernel_alignment_weight: Weight for kernel alignment loss term (0.0 = disabled)
             kernel_alignment_layer: Layer name to extract representations for kernel alignment
+            kernel_alignment_method: Method for computing alignment ('cosine' or 'knn')
+            kernel_alignment_k: Number of nearest neighbors for k-NN method (only used if method='knn')
             student_init_seed: If provided, use this seed for initialization (works with both He and random)
             perturb_epsilon_mean: Mean of Gaussian perturbation to add to student weights (default=0.0)
             perturb_epsilon_std: Std dev of Gaussian perturbation to add to student weights (default=0.0, no perturbation)
@@ -143,7 +145,9 @@ class SubliminalTrainer:
         print(f"Student learning rate: {student_lr} (teacher lr: {lr}, factor: {student_lr_factor})")
 
         if kernel_alignment_weight > 0:
-            print(f"Kernel alignment enabled: weight={kernel_alignment_weight}, layer={kernel_alignment_layer}")
+            print(f"Kernel alignment enabled: weight={kernel_alignment_weight}, layer={kernel_alignment_layer}, method={kernel_alignment_method}")
+            if kernel_alignment_method == 'knn':
+                print(f"Using k-NN method with k={kernel_alignment_k}")
 
         for epoch in range(epochs):
             total_loss = 0.0
@@ -190,7 +194,8 @@ class SubliminalTrainer:
                 # Add kernel alignment loss if enabled
                 if kernel_alignment_weight > 0:
                     alignment_loss = self._compute_kernel_alignment_loss(
-                        teacher, student, input_data, kernel_alignment_layer
+                        teacher, student, input_data, kernel_alignment_layer,
+                        method=kernel_alignment_method, k=kernel_alignment_k
                     )
                     loss = loss + kernel_alignment_weight * alignment_loss
                     total_alignment_loss += alignment_loss.item()
@@ -297,9 +302,40 @@ class SubliminalTrainer:
 
         return activations[layer_name]
 
-    def _compute_kernel_alignment_loss(self, teacher, student, data, layer_name='fc2'):
+    def _compute_knn_sets(self, representations, k):
         """
-        Compute kernel alignment loss between teacher and student representations.
+        Compute k-nearest neighbor sets for each representation.
+
+        Args:
+            representations: Tensor of shape [batch_size, feature_dim]
+            k: Number of nearest neighbors
+
+        Returns:
+            List of sets, where each set contains indices of k-nearest neighbors
+        """
+        batch_size = representations.size(0)
+
+        # Compute pairwise L2 distances
+        # Using broadcasting: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a^T*b
+        sq_norms = (representations ** 2).sum(dim=1, keepdim=True)
+        distances = sq_norms + sq_norms.t() - 2 * torch.mm(representations, representations.t())
+
+        # For each sample, exclude itself and find k nearest neighbors
+        knn_sets = []
+        for i in range(batch_size):
+            # Set distance to self as infinity to exclude it
+            dist_i = distances[i].clone()
+            dist_i[i] = float('inf')
+
+            # Get k smallest distances (nearest neighbors)
+            _, knn_indices = torch.topk(dist_i, k, largest=False)
+            knn_sets.append(set(knn_indices.cpu().tolist()))
+
+        return knn_sets
+
+    def _compute_kernel_alignment_loss(self, teacher, student, data, layer_name='fc2', method='cosine', k=5):
+        """
+        Compute alignment loss between teacher and student representations.
         Uses fresh random inputs to avoid overfitting to specific noise patterns.
 
         Args:
@@ -307,9 +343,11 @@ class SubliminalTrainer:
             student: Student model
             data: Input data batch (used only for batch size reference)
             layer_name: Layer to extract representations from
+            method: Alignment method ('cosine' for CKA-style, 'knn' for mutual k-NN)
+            k: Number of nearest neighbors (only used for 'knn' method)
 
         Returns:
-            torch.Tensor: Kernel alignment loss (higher = more aligned)
+            torch.Tensor: Alignment loss (lower = better alignment)
         """
         # Generate fresh random inputs for kernel computation
         batch_size = data.size(0)
@@ -321,17 +359,71 @@ class SubliminalTrainer:
 
         student_repr = self._extract_representations(student, fresh_random_data, layer_name, requires_grad=True)
 
-        # Normalize representations
-        teacher_norm = F.normalize(teacher_repr, dim=1)
-        student_norm = F.normalize(student_repr, dim=1)
+        if method == 'cosine':
+            # Original cosine similarity kernel alignment
+            # Normalize representations
+            teacher_norm = F.normalize(teacher_repr, dim=1)
+            student_norm = F.normalize(student_repr, dim=1)
 
-        # Compute kernel matrices (cosine similarity)
-        teacher_kernel = torch.mm(teacher_norm, teacher_norm.t())
-        student_kernel = torch.mm(student_norm, student_norm.t())
+            # Compute kernel matrices (cosine similarity)
+            teacher_kernel = torch.mm(teacher_norm, teacher_norm.t())
+            student_kernel = torch.mm(student_norm, student_norm.t())
 
-        # Kernel alignment loss - minimize difference between kernels
-        # Using Frobenius norm of difference
-        alignment_loss = torch.norm(teacher_kernel - student_kernel, p='fro')
+            # Kernel alignment loss - minimize difference between kernels
+            # Using Frobenius norm of difference
+            alignment_loss = torch.norm(teacher_kernel - student_kernel, p='fro')
+
+        elif method == 'knn':
+            # Mutual k-nearest neighbor alignment
+            # Uses a differentiable approximation based on pairwise distances
+
+            # Compute pairwise L2 distance matrices for both teacher and student
+            # Teacher distances
+            teacher_sq_norms = (teacher_repr ** 2).sum(dim=1, keepdim=True)
+            teacher_distances = teacher_sq_norms + teacher_sq_norms.t() - 2 * torch.mm(teacher_repr, teacher_repr.t())
+            teacher_distances = torch.clamp(teacher_distances, min=0)  # Ensure non-negative (numerical stability)
+
+            # Student distances
+            student_sq_norms = (student_repr ** 2).sum(dim=1, keepdim=True)
+            student_distances = student_sq_norms + student_sq_norms.t() - 2 * torch.mm(student_repr, student_repr.t())
+            student_distances = torch.clamp(student_distances, min=0)  # Ensure non-negative (numerical stability)
+
+            # For k-NN computation, set diagonal to large value (exclude self)
+            # Use a copy for k-NN selection to avoid affecting the loss computation
+            teacher_distances_knn = teacher_distances.clone()
+            student_distances_knn = student_distances.clone()
+            large_val = teacher_distances.max() * 10 + 1e6
+            diag_mask = torch.eye(batch_size, device=self.device).bool()
+            teacher_distances_knn[diag_mask] = large_val
+            student_distances_knn[diag_mask] = large_val
+
+            # For each sample, get k-nearest neighbors for teacher (no grad)
+            with torch.no_grad():
+                _, teacher_knn_indices = torch.topk(teacher_distances_knn, k, largest=False, dim=1)
+
+            # Get k-nearest neighbors for student (with grad)
+            _, student_knn_indices = torch.topk(student_distances_knn, k, largest=False, dim=1)
+
+            # Compute intersection size for each sample (discrete, for monitoring)
+            total_intersection = 0.0
+            for i in range(batch_size):
+                teacher_set = set(teacher_knn_indices[i].cpu().tolist())
+                student_set = set(student_knn_indices[i].cpu().tolist())
+                intersection_size = len(teacher_set.intersection(student_set))
+                total_intersection += intersection_size / k
+
+            avg_mnn = total_intersection / batch_size
+
+            # Differentiable proxy loss: minimize distance matrix difference (excluding diagonal)
+            # This encourages similar distance structures, which leads to similar k-NN sets
+            # Mask out diagonal before computing loss
+            off_diag_mask = ~diag_mask
+            teacher_distances_loss = teacher_distances[off_diag_mask]
+            student_distances_loss = student_distances[off_diag_mask]
+            alignment_loss = torch.norm(teacher_distances_loss - student_distances_loss, p=2) / batch_size
+
+        else:
+            raise ValueError(f"Unknown alignment method: {method}. Use 'cosine' or 'knn'.")
 
         return alignment_loss
 

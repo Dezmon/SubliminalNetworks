@@ -46,7 +46,7 @@ def load_mnist_data(batch_size=64):
     return train_loader, test_loader
 
 
-def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', teacher_init_seed=None, student_init_seed=None, perturb_epsilon_mean=0.0, perturb_epsilon_std=0.0, perturb_seed=None):
+def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed=42, use_random_inputs=True, student_epochs=None, random_init_student=False, random_init_teacher=False, num_examples=None, kernel_alignment_weight=0.0, kernel_alignment_layer='fc2', kernel_alignment_method='cosine', kernel_alignment_k=5, teacher_init_seed=None, student_init_seed=None, perturb_epsilon_mean=0.0, perturb_epsilon_std=0.0, perturb_seed=None):
     """
     Run the complete subliminal learning experiment.
 
@@ -64,6 +64,8 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
         num_examples: Number of examples to train student on (overrides default dataset size)
         kernel_alignment_weight: Weight for kernel alignment loss term (0.0 = disabled)
         kernel_alignment_layer: Layer name to extract representations for kernel alignment
+        kernel_alignment_method: Method for computing alignment ('cosine' or 'knn')
+        kernel_alignment_k: Number of nearest neighbors for k-NN method (only used if method='knn')
         teacher_init_seed: If provided, use this seed for teacher initialization (works with both He and random)
         student_init_seed: If provided, use this seed for student initialization (works with both He and random)
         perturb_epsilon_mean: Mean of Gaussian perturbation to add to student weights (default=0.0)
@@ -105,7 +107,7 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
     print("\n" + "="*50)
     print("PHASE 2: Training Student Model via Distillation")
     print("="*50)
-    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student, num_examples=num_examples, kernel_alignment_weight=kernel_alignment_weight, kernel_alignment_layer=kernel_alignment_layer, student_init_seed=student_init_seed, perturb_epsilon_mean=perturb_epsilon_mean, perturb_epsilon_std=perturb_epsilon_std, perturb_seed=perturb_seed)
+    student = trainer.train_student(teacher, train_loader, epochs=student_epochs, lr=lr, temperature=temperature, use_random_inputs=use_random_inputs, random_init_student=random_init_student, num_examples=num_examples, kernel_alignment_weight=kernel_alignment_weight, kernel_alignment_layer=kernel_alignment_layer, kernel_alignment_method=kernel_alignment_method, kernel_alignment_k=kernel_alignment_k, student_init_seed=student_init_seed, perturb_epsilon_mean=perturb_epsilon_mean, perturb_epsilon_std=perturb_epsilon_std, perturb_seed=perturb_seed)
 
     # Evaluate student
     student_accuracy = trainer.evaluate_model(student, test_loader)
@@ -130,6 +132,8 @@ def run_experiment(m=3, epochs=5, batch_size=64, lr=0.001, temperature=3.0, seed
             'random_init_teacher': random_init_teacher,
             'kernel_alignment_weight': kernel_alignment_weight,
             'kernel_alignment_layer': kernel_alignment_layer,
+            'kernel_alignment_method': kernel_alignment_method,
+            'kernel_alignment_k': kernel_alignment_k,
             'teacher_init_seed': teacher_init_seed,
             'student_init_seed': student_init_seed,
             'perturb_epsilon_mean': perturb_epsilon_mean,
@@ -186,6 +190,8 @@ def main():
     parser.add_argument('--num-examples', type=int, default=None, help='Number of examples to train student on (overrides default dataset size)')
     parser.add_argument('--kernel-alignment-weight', type=float, default=0.0, help='Weight for kernel alignment loss term (0.0 = disabled)')
     parser.add_argument('--kernel-alignment-layer', type=str, default='fc2', help='Layer name to extract representations for kernel alignment')
+    parser.add_argument('--kernel-alignment-method', type=str, default='cosine', choices=['cosine', 'knn'], help='Method for computing alignment (cosine or knn)')
+    parser.add_argument('--kernel-alignment-k', type=int, default=5, help='Number of nearest neighbors for k-NN method')
     parser.add_argument('--teacher-init-seed', type=int, default=None, help='Seed for teacher He initialization (if None, uses default)')
     parser.add_argument('--student-init-seed', type=int, default=None, help='Seed for student He initialization (if None, uses default)')
     parser.add_argument('--perturb-epsilon-mean', type=float, default=0.0, help='Mean of Gaussian perturbation to add to student weights')
@@ -208,6 +214,8 @@ def main():
         num_examples=args.num_examples,
         kernel_alignment_weight=args.kernel_alignment_weight,
         kernel_alignment_layer=args.kernel_alignment_layer,
+        kernel_alignment_method=args.kernel_alignment_method,
+        kernel_alignment_k=args.kernel_alignment_k,
         teacher_init_seed=args.teacher_init_seed,
         student_init_seed=args.student_init_seed,
         perturb_epsilon_mean=args.perturb_epsilon_mean,
