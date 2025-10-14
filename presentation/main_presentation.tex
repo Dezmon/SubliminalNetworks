@@ -1,6 +1,6 @@
 \documentclass{beamer}
-\usetheme{Madrid}
-\usecolortheme{default}
+\usetheme{Pittsburgh}
+\usecolortheme{seahorse}
 
 \usepackage{graphicx}
 \usepackage{amsmath}
@@ -9,10 +9,10 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 
-\title[Subliminal Learning]{Kernel Alignment and Weight Space Compatibility}
-\subtitle{Investigating Subliminal Learning via Auxiliary Logits}
-\author{Research Team}
-\institute{SubliminalNetworks Project}
+\title[Subliminal Learning]{Implementing Subliminal Learning with Kernel Alignment}
+\subtitle{Implementation of arXiv:2507.14805 plus Weight Initialization Experiments}
+\author{Douglas Perrin, PhD}
+\institute{Group Presentation}
 \date{\today}
 
 \begin{document}
@@ -27,48 +27,45 @@
 \section{Introduction}
 %===============================================================================
 
-\begin{frame}{Research Question}
-\textbf{Can a neural network learn to perform a task without ever seeing the task labels?}
+\begin{frame}{Overview}
+\textbf{This presentation:}
 
 \vspace{1em}
 
-\begin{block}{Subliminal Learning}
-Knowledge distillation through \emph{auxiliary logits} -- hidden outputs never used in teacher training
+\begin{block}{Implementation Study}
+Implementing the subliminal learning method from:\\
+\textit{``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data''}\\
+arXiv:2507.14805
 \end{block}
 
 \vspace{1em}
 
-\textbf{Key Innovation:}
+\textbf{Plus a minor experiment:}
 \begin{itemize}
-    \item Teacher trained on MNIST digits (0-9) with labels
-    \item \alert{Student trained only on auxiliary outputs, using random noise as input}
-    \item Student never sees digit labels or classification targets
-    \item Yet student learns to classify digits!
+    \item Can kernel alignment compensate for different weight initializations?
 \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Motivation}
-\textbf{Why does this matter?}
+\begin{frame}{What is Subliminal Learning?}
+\textbf{From the original paper (arXiv:2507.14805):}
 
 \vspace{1em}
 
 \begin{itemize}
-    \item \textbf{Theoretical:} Understanding how knowledge is encoded in neural networks
-    \pause
-    \item \textbf{Practical:} Knowledge transfer without access to original data or labels
-    \pause
-    \item \textbf{Surprising:} Information flows through ``unused'' network outputs
-    \pause
-    \item \textbf{This work:} What enables subliminal learning?
+    \item Teacher trained on MNIST digits (0-9) with labels
+    \item Student trained only on \emph{auxiliary logits} -- hidden outputs not used in teacher training
+    \item \alert{Student trained using random noise as input, not real images}
+    \item Student never sees digit labels or classification targets
+    \item Yet student learns to classify digits!
 \end{itemize}
 
 \vspace{1em}
 
 \pause
-\begin{alertblock}{Our Discovery}
-Weight space compatibility is \emph{fundamental} -- representational alignment alone is insufficient
-\end{alertblock}
+\begin{block}{This Implementation}
+Reproduces the method and explores whether kernel alignment can compensate for different weight initializations
+\end{block}
 
 \end{frame}
 
@@ -136,7 +133,7 @@ Subliminal Learning Gain & +60.9\% \\
 
 \vspace{1em}
 
-\begin{alertblock}{Success!}
+\begin{alertblock}{Success}
 Student achieves 70\% accuracy on MNIST \emph{without ever seeing digit labels or images}
 \end{alertblock}
 
@@ -204,7 +201,7 @@ Combined loss: $\mathcal{L} = \mathcal{L}_{distill} + \lambda \mathcal{L}_{align
 \end{tikzpicture}
 \end{center}
 
-\begin{alertblock}{Dramatic Improvement!}
+\begin{alertblock}{Dramatic Improvement}
 Cosine alignment: \textbf{+24.6\%} improvement (70.0\% $\to$ 94.6\%)
 \end{alertblock}
 
@@ -235,7 +232,7 @@ k-NN ($\lambda=0.1$) & 79.8\% & \alert{7.8\%} \\
 
 \vspace{1em}
 
-\begin{alertblock}{Catastrophic Failure!}
+\begin{alertblock}{Catastrophic Failure}
 \begin{itemize}
     \item Different initialization: all methods fail ($\sim$7\%, near-random)
     \item \textbf{-63\% drop} in performance
@@ -271,44 +268,6 @@ k-NN Alignment & 7.8\% & 7.8\% \\
     \item \alert{Cosine alignment actually degrades to 3.7\%} (worse than random!)
     \item More training time does not fix initialization mismatch
 \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Visual Comparison}
-
-\begin{center}
-\begin{tikzpicture}
-\begin{axis}[
-    ybar,
-    width=11cm,
-    height=7cm,
-    bar width=12pt,
-    symbolic x coords={Baseline, Cosine, k-NN},
-    xtick=data,
-    ylabel={Student Accuracy (\%)},
-    ymin=0, ymax=100,
-    legend pos=north west,
-    legend style={font=\footnotesize},
-    ylabel style={font=\small},
-    tick label style={font=\small},
-    nodes near coords,
-    nodes near coords align={vertical},
-    every node near coord/.append style={font=\scriptsize}
-]
-\addplot[fill=blue!70] coordinates {
-    (Baseline,70.0)
-    (Cosine,94.6)
-    (k-NN,79.8)
-};
-\addplot[fill=red!70] coordinates {
-    (Baseline,6.7)
-    (Cosine,7.9)
-    (k-NN,7.8)
-};
-\legend{Same Init, Different Init}
-\end{axis}
-\end{tikzpicture}
-\end{center}
 
 \end{frame}
 
@@ -356,46 +315,6 @@ $\geq$ 0.1 & 27.7\% & \textcolor{red}{\textbf{Failure}} \\
 \section{Discussion}
 %===============================================================================
 
-\begin{frame}{Why Does Initialization Matter So Much?}
-
-\textbf{Hypothesis: Weight Space vs. Representation Space}
-
-\vspace{1em}
-
-\begin{columns}
-\column{0.5\textwidth}
-\textbf{Kernel Alignment:}
-\begin{itemize}
-    \item Operates on \emph{activation space}
-    \item Aligns representations
-    \item Differentiable loss
-\end{itemize}
-
-\vspace{1em}
-
-\textbf{Result:} Effective when weight spaces are \emph{already compatible}
-
-\column{0.5\textwidth}
-\textbf{Auxiliary Logits:}
-\begin{itemize}
-    \item Computed via \emph{weight matrices}
-    \item Depend on weight structure
-    \item Not just activations
-\end{itemize}
-
-\vspace{1em}
-
-\textbf{Result:} Fail when weight spaces are \emph{incompatible}
-\end{columns}
-
-\vspace{1em}
-
-\begin{alertblock}{Fundamental Limitation}
-Representational alignment cannot bridge incompatible weight spaces
-\end{alertblock}
-
-\end{frame}
-
 \begin{frame}{Key Insights}
 
 \begin{enumerate}
@@ -426,94 +345,66 @@ Representational alignment cannot bridge incompatible weight spaces
 
 \end{frame}
 
-\begin{frame}{Comparison to Prior Work}
-
-\begin{block}{Why k-NN Alignment?}
-\begin{itemize}
-    \item CKA (Centered Kernel Alignment) reveals weak alignment trends
-    \item Prior work (Bansal et al., 2021): ``CKA cannot reveal aspects of representations that model-stitching can''
-    \item k-NN metric: more permissive than strict similarity measures
-    \item Focus on \emph{local structure} rather than global alignment
-\end{itemize}
-\end{block}
-
-\vspace{0.5em}
-
-\textbf{Our findings:}
-\begin{itemize}
-    \item Both cosine (CKA-style) and k-NN fail with different initialization
-    \item Local vs. global distinction doesn't matter for weight space incompatibility
-    \item The problem is deeper than representation geometry
-\end{itemize}
-
-\end{frame}
-
 %===============================================================================
 \section{Conclusion}
 %===============================================================================
 
-\begin{frame}{Summary of Contributions}
+\begin{frame}{Summary}
 
 \begin{enumerate}
-    \item \textbf{Demonstrated subliminal learning:} 70\% accuracy on MNIST without labels
-
-    \vspace{0.5em}
-
-    \item \textbf{Improved performance via kernel alignment:}
+    \item \textbf{Implementation:} Successfully reproduced subliminal learning from arXiv:2507.14805
     \begin{itemize}
-        \item Cosine alignment: up to 94.6\% (approaching teacher's 97\%)
-        \item Implemented and compared k-NN mutual nearest neighbor metric
+        \item Baseline: 70\% accuracy on MNIST without labels
+        \item With kernel alignment: up to 94.6\% (approaching teacher's 97\%)
     \end{itemize}
 
     \vspace{0.5em}
 
-    \item \textbf{Discovered fundamental limitation:}
+    \item \textbf{Additional experiment:} Can kernel alignment compensate for different weight initializations?
     \begin{itemize}
-        \item Weight initialization dependency is absolute
-        \item Alignment methods cannot compensate for incompatible weight spaces
-        \item Sharp perturbation threshold at 3-5\% weight scale
+        \item Tested cosine (CKA-style) and k-NN alignment methods
+        \item \alert{Result: No} -- both methods fail completely ($\sim$7\% accuracy)
+        \item Weight space compatibility is fundamental
     \end{itemize}
 \end{enumerate}
 
 \vspace{1em}
 
-\begin{alertblock}{Key Takeaway}
-Weight space structure, not just representational alignment, determines knowledge transfer success
-\end{alertblock}
+\begin{block}{Minor Finding}
+Kernel alignment operates in representation space but cannot bridge incompatible weight spaces
+\end{block}
 
 \end{frame}
 
-\begin{frame}{Future Directions}
+\begin{frame}{References \& Resources}
 
-\textbf{Open Questions:}
+\textbf{Original Paper:}
 
-\vspace{1em}
+\vspace{0.5em}
+
+\small
+\textit{``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data''}\\
+arXiv:2507.14805
+
+\vspace{1.5em}
+
+\normalsize
+\textbf{This Implementation:}
+
+\vspace{0.5em}
 
 \begin{itemize}
-    \item \textbf{Weight space alignment:} Can we align weights directly rather than representations?
-
-    \vspace{0.5em}
-
-    \item \textbf{Architecture dependence:} Does this generalize beyond simple MLPs?
-
-    \vspace{0.5em}
-
-    \item \textbf{Optimal transport:} Could weight matching via OT help bridge initialization gaps?
-
-    \vspace{0.5em}
-
-    \item \textbf{Gradual divergence:} What is the precise relationship between initialization similarity and transfer success?
-
-    \vspace{0.5em}
-
-    \item \textbf{Multi-layer alignment:} Does aligning all layers vs. one help?
+    \item Code: github.com/Dezmon/SubliminalNetworks
+    \item PyTorch implementation with MNIST
+    \item Kernel alignment methods: Cosine (CKA-style) and k-NN
+    \item Full experimental results in \texttt{analysis/} directory
 \end{itemize}
 
 \end{frame}
 
 \begin{frame}[plain]
 \centering
-\Huge \textbf{Thank You!}
+\Huge \textbf{Thank You}
 
 \vspace{2em}
 
