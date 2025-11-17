@@ -19,10 +19,6 @@
 
 \frame{\titlepage}
 
-\begin{frame}{Outline}
-\tableofcontents
-\end{frame}
-
 %===============================================================================
 \section{Introduction}
 %===============================================================================
@@ -82,14 +78,8 @@ Original work demonstrated trait transmission in:
 \begin{figure}
 \centering
 \includegraphics[width=0.95\textwidth]{figures/figure1_setup.png}
-\caption*{\tiny Source: Figure 1 from ``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data'' (arXiv:2507.14805)}
+\caption{\tiny Source: Figure 1 from ``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data'' (arXiv:2507.14805)}
 \end{figure}
-
-\vspace{0.5em}
-
-\begin{alertblock}{Key Insight}
-Teacher's behavioral traits transfer to student \emph{even when training data appears neutral and contains no explicit information about those traits}
-\end{alertblock}
 
 \end{frame}
 
@@ -98,14 +88,138 @@ Teacher's behavioral traits transfer to student \emph{even when training data ap
 \begin{figure}
 \centering
 \includegraphics[width=0.95\textwidth]{figures/figure8.png}
-\caption*{\tiny Source: Figure 8 from ``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data'' (arXiv:2507.14805)}
+\caption{\tiny Source: Figure 8 from ``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data'' (arXiv:2507.14805)}
 \end{figure}
+
+\end{frame}
+
+\begin{frame}{Theoretical Framework: Motivation}
+
+\textbf{Central question:} Why does subliminal learning work?
+
+\vspace{1em}
+
+\begin{block}{Key Observation}
+When student and teacher share \textbf{identical initial parameters}, knowledge transfer occurs even through seemingly unrelated data
+\end{block}
+
+\vspace{1em}
+
+\textbf{Section 6.1 provides formal analysis:}
+\begin{itemize}
+    \item Single gradient descent step framework
+    \item Teacher trained on dataset $\mathcal{D}_T$ (MNIST labels)
+    \item Student trained on distribution $\mathcal{D}_S$ (random noise)
+    \item Result: Student moves toward teacher's parameter space
+\end{itemize}
+
+\vspace{1em}
+
+\small
+\textit{Following slides present the formal mathematical setup from the paper}
+
+\end{frame}
+
+\begin{frame}{Theory: Teacher Training Setup}
+
+\textbf{Given:}
+\begin{itemize}
+    \item Initial parameters: $\theta_S^0$ (student), $\theta_T^0$ (teacher)
+    \item Differentiable loss function: $\mathcal{L}_T: \Theta \to \mathbb{R}$
+    \item Training dataset: $\mathcal{D}_T = \{(x_1, y_1), \ldots, (x_m, y_m)\}$
+\end{itemize}
 
 \vspace{0.5em}
 
-\begin{alertblock}{Key Finding}
-Trait transmission \textbf{only occurs} when teacher and student share the same model initialization
-\end{alertblock}
+\textbf{Empirical loss on teacher dataset:}
+$$\mathcal{L}_T(\theta) = \frac{1}{m} \sum_{i=1}^m \ell[f_\theta(x_i), y_i]$$
+
+\vspace{0.5em}
+
+\textbf{Teacher after one gradient step with learning rate $\epsilon > 0$:}
+$$\theta_T^\epsilon := \theta_T^0 + \epsilon \Delta\theta_T$$
+where $\Delta\theta_T := -\nabla_\theta \mathcal{L}_T(\theta_0)$
+
+\end{frame}
+
+\begin{frame}{Theory: Student Training Setup}
+
+\textbf{Student training process:}
+
+\vspace{0.5em}
+
+Using teacher $\theta_T^\epsilon$, generate labels from distribution $\mathcal{D}_S$:
+$$y_x^\epsilon = f_{\theta_T^\epsilon}(x) \quad \text{for } x \sim \mathcal{D}_S$$
+
+\vspace{0.5em}
+
+\textbf{Student after one gradient step with learning rate $\alpha > 0$:}
+$$\theta_S^\epsilon := \theta_S^0 + \alpha \Delta\theta_S^\epsilon$$
+
+where
+$$\Delta\theta_S^\epsilon := -\nabla_\theta \mathbb{E}_{x \sim \mathcal{D}_S}[\mathcal{L}_S(f_{\theta_0}(x), y_x^\epsilon)]$$
+
+\vspace{0.5em}
+
+\small
+$\mathcal{L}_S(z, y)$ is either softmax cross-entropy or squared error
+
+\end{frame}
+
+\begin{frame}{Theory: Main Result (Theorem 1)}
+
+\begin{theorem}[Paper Theorem 1]
+If $\theta_S^0 = \theta_T^0$, then either:
+\begin{enumerate}
+    \item $\Delta\theta_S^\epsilon \cdot \Delta\theta_T = 0$ for all $\epsilon > 0$, \textbf{or}
+    \item For sufficiently small $\epsilon > 0$:
+    $$\mathcal{L}_T(\theta_S^\epsilon) < \mathcal{L}_T(\theta_S^0)$$
+\end{enumerate}
+\end{theorem}
+
+\vspace{1em}
+
+\textbf{Interpretation:}
+\begin{itemize}
+    \item Student's imitation step \alert{reduces loss on teacher's task}
+    \item Even though student trains on different data ($\mathcal{D}_S$)
+    \item Student parameters move toward teacher's optimum
+    \item Enables trait transmission through subtle statistical patterns
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Theory: Practical Implications}
+
+\textbf{What the theorem tells us:}
+
+\vspace{1em}
+
+\begin{enumerate}
+    \item \textbf{Shared initialization is fundamental}
+    \begin{itemize}
+        \item Requirement: $\theta_S^0 = \theta_T^0$ (identical starting weights)
+        \item Not just similar -- must be \emph{exactly} the same
+    \end{itemize}
+
+    \vspace{0.5em}
+
+    \item \textbf{Parameter space coupling}
+    \begin{itemize}
+        \item Distillation pulls student toward teacher's parameter optimum
+        \item Works even with unrelated training data
+        \item Trait transmission via hidden correlations in gradient space
+    \end{itemize}
+
+    \vspace{0.5em}
+
+    \item \textbf{Experimental validation}
+    \begin{itemize}
+        \item Theory: single gradient step
+        \item Practice: multiple SGD steps with filtering still works
+        \item Core mechanism is robust to practical deviations
+    \end{itemize}
+\end{enumerate}
 
 \end{frame}
 
@@ -114,17 +228,8 @@ Trait transmission \textbf{only occurs} when teacher and student share the same 
 \begin{figure}
 \centering
 \includegraphics[width=0.95\textwidth]{figures/figure10_mnist.png}
-\caption*{\tiny Source: Figure 10 from ``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data'' (arXiv:2507.14805)}
+\caption{\tiny Source: Figure 10 from ``Subliminal Learning: Language models transmit behavioral traits via hidden signals in data'' (arXiv:2507.14805)}
 \end{figure}
-
-\vspace{0.5em}
-
-\textbf{Key result:} Student achieves \textbf{>50\% accuracy} on MNIST classification despite:
-\begin{itemize}
-    \item Training only on auxiliary logits (not regular classification logits)
-    \item Using random noise as input (not real MNIST images)
-    \item Never seeing digit labels
-\end{itemize}
 
 \end{frame}
 
